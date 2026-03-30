@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Microservices Dashboard</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;background:#f7f8fa}
+    h1{font-size:20px;margin-bottom:10px}
+    .grid{display:flex;gap:16px}
+    .card{background:#fff;border:1px solid #e1e4e8;padding:12px;border-radius:6px;width:320px;box-shadow:0 1px 2px rgba(0,0,0,0.03)}
+    .service-name{font-weight:600;margin-bottom:8px}
+    .status{font-weight:700;margin-bottom:8px}
+    .output{background:#0f1724;color:#e6eef8;padding:8px;border-radius:4px;white-space:pre-wrap;overflow:auto;max-height:120px}
+  </style>
+</head>
+
+<body>
+  <h1>Microservices Status</h1>
+  <div class="grid">
+    <div class="card" id="svc-a">
+      <div class="service-name">service-a</div>
+      <div class="status">Loading...</div>
+      <pre class="output"></pre>
+    </div>
+    <div class="card" id="svc-b">
+      <div class="service-name">service-b</div>
+      <div class="status">Loading...</div>
+      <pre class="output"></pre>
+    </div>
+  </div>
+  <script>
+    const services = [
+      { id: 'svc-a', url: 'http://localhost:3000/', expect: 'hello from service-a' },
+      { id: 'svc-b', url: 'http://localhost:5000/', expect: 'hello from service-b' }
+    ];
+
+    // timeout-aware fetch
+    function fetchWithTimeout(url, ms = 4000) {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), ms);
+      return fetch(url, { cache: 'no-store', signal: controller.signal })
+        .finally(() => clearTimeout(id));
+    }
+
+    async function checkService(s) {
+      const el = document.getElementById(s.id);
+      const statusEl = el.querySelector('.status');
+      const outEl = el.querySelector('.output');
+
+      statusEl.textContent = 'Checking...';
+      statusEl.style.color = 'inherit';
+      outEl.textContent = '';
+
+      try {
+        const res = await fetchWithTimeout(s.url, 4000);
+        const text = await res.text();
+        outEl.textContent = `status=${res.status} ${res.statusText}\n${text}`;
+
+        if (!res.ok) {
+          statusEl.textContent = `ERROR ${res.status}`;
+          statusEl.style.color = 'crimson';
+          return;
+        }
+
+        if (text.trim() === s.expect) {
+          statusEl.textContent = 'OK';
+          statusEl.style.color = 'green';
+        } else {
+          statusEl.textContent = 'INVALID';
+          statusEl.style.color = 'crimson';
+        }
+      } catch (err) {
+        const isAbort = err.name === 'AbortError';
+        statusEl.textContent = isAbort ? 'TIMEOUT' : 'DOWN';
+        statusEl.style.color = 'gray';
+        outEl.textContent = String(err);
+      }
+    }
+
+    async function runChecks() {
+      await Promise.all(services.map(s => checkService(s)));
+    }
+
+    runChecks();
+    setInterval(runChecks, 5000);
+  </script>
+</body>
+
+</html>

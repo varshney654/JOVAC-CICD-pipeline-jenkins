@@ -1,0 +1,7 @@
+pipeline {
+  agent any
+  stages {
+    stage('checkout') { steps { checkout scm } }
+    stage('install') { steps { sh 'npm ci' } }
+  }
+}
